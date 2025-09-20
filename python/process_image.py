@@ -5,6 +5,7 @@ Simple but Effective AI Image Resizer
 - Edge-preserving smoothing
 - Adaptive sharpening
 - Lightweight and fast
+- Memory-efficient for large images
 """
 
 import argparse
@@ -16,6 +17,7 @@ from typing import Tuple
 import numpy as np
 import cv2
 from PIL import Image, ImageEnhance, ImageFilter
+import gc
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -29,9 +31,17 @@ class SmartImageResizer:
         logger.info(f"Smart resizer initialized for {target_size}")
 
     def smart_resize(self, image: Image.Image) -> Image.Image:
-        """Smart multi-step resizing for best quality"""
+        """Memory-efficient smart multi-step resizing for best quality"""
         original_size = image.size
         target_w, target_h = self.target_size
+        
+        logger.info(f"Processing {original_size} -> {self.target_size}")
+        
+        # Memory optimization: work with smaller chunks for very large images
+        if original_size[0] * original_size[1] > 10_000_000:  # > 10MP
+            logger.info("Large image detected - using memory-efficient processing")
+            # For very large images, resize in multiple steps to save memory
+            return self._resize_large_image(image)
         
         # Convert to high-quality array
         img_array = np.array(image.convert('RGB')).astype(np.float32)
@@ -74,6 +84,33 @@ class SmartImageResizer:
                 current_img = cv2.resize(current_img, new_size, interpolation=cv2.INTER_AREA)
             
             current_size = new_size
+            
+            # Memory cleanup
+            gc.collect()
+        
+        return Image.fromarray(np.clip(final_img, 0, 255).astype(np.uint8))
+
+    def _resize_large_image(self, image: Image.Image) -> Image.Image:
+        """Memory-efficient resizing for very large images"""
+        original_size = image.size
+        
+        # First, do a quick downsample to manageable size if needed
+        max_intermediate_size = 2000
+        if max(original_size) > max_intermediate_size:
+            # Calculate intermediate size maintaining aspect ratio
+            scale = max_intermediate_size / max(original_size)
+            intermediate_size = (int(original_size[0] * scale), int(original_size[1] * scale))
+            
+            logger.info(f"Step 1: Downsampling to {intermediate_size} for memory efficiency")
+            # Use PIL's high-quality resize for the first step
+            image = image.resize(intermediate_size, Image.LANCZOS)
+            
+            # Force garbage collection
+            gc.collect()
+        
+        # Now proceed with normal smart resize
+        img_array = np.array(image.convert('RGB')).astype(np.float32)
+        final_img = cv2.resize(img_array, self.target_size, interpolation=cv2.INTER_LANCZOS4)
         
         return Image.fromarray(np.clip(final_img, 0, 255).astype(np.uint8))
 
@@ -127,13 +164,25 @@ class SmartImageResizer:
             original_size = image.size
             logger.info(f"Original size: {original_size}")
             
+            # Memory usage estimation
+            memory_mb = (original_size[0] * original_size[1] * 3) / (1024 * 1024)
+            logger.info(f"Estimated memory usage: {memory_mb:.1f} MB (CPU only)")
+            
             # Step 1: Smart resize
             logger.info("Applying smart resize...")
             resized_image = self.smart_resize(image)
             
+            # Clean up original image from memory
+            del image
+            gc.collect()
+            
             # Step 2: Smart enhancement
             logger.info("Applying smart enhancement...")
             final_image = self.enhance_image(resized_image)
+            
+            # Clean up intermediate image
+            del resized_image
+            gc.collect()
             
             # Save with high quality
             final_image.save(output_path, quality=95, optimize=True)
@@ -166,6 +215,9 @@ class SmartImageResizer:
             output_file = output_path / img_file.name
             if self.process_image(str(img_file), str(output_file)):
                 success_count += 1
+            
+            # Clean up between images
+            gc.collect()
         
         logger.info(f"Successfully processed {success_count}/{len(image_files)} images")
         return success_count

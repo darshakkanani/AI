@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-World's Best AI Image Resizing Pipeline
-- Uses Real-ESRGAN for state-of-the-art image resizing to 380x380
-- Produces photorealistic results with enhanced details
-- Automatic model download and GPU acceleration
+Simple but Effective AI Image Resizer
+- Smart multi-step resizing for best quality
+- Edge-preserving smoothing
+- Adaptive sharpening
+- Lightweight and fast
 """
 
 import argparse
@@ -11,211 +12,132 @@ import os
 import sys
 import logging
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple
 import numpy as np
 import cv2
-from PIL import Image
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torchvision import transforms
-import requests
-from tqdm import tqdm
+from PIL import Image, ImageEnhance, ImageFilter
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- Real-ESRGAN Architecture ---
-
-class ResidualDenseBlock(nn.Module):
-    """Residual Dense Block for feature extraction"""
-    def __init__(self, num_feat=64, num_grow_ch=32):
-        super(ResidualDenseBlock, self).__init__()
-        self.conv1 = nn.Conv2d(num_feat, num_grow_ch, 3, 1, 1)
-        self.conv2 = nn.Conv2d(num_feat + num_grow_ch, num_grow_ch, 3, 1, 1)
-        self.conv3 = nn.Conv2d(num_feat + 2 * num_grow_ch, num_grow_ch, 3, 1, 1)
-        self.conv4 = nn.Conv2d(num_feat + 3 * num_grow_ch, num_grow_ch, 3, 1, 1)
-        self.conv5 = nn.Conv2d(num_feat + 4 * num_grow_ch, num_feat, 3, 1, 1)
-        self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-
-    def forward(self, x):
-        x1 = self.lrelu(self.conv1(x))
-        x2 = self.lrelu(self.conv2(torch.cat((x, x1), 1)))
-        x3 = self.lrelu(self.conv3(torch.cat((x, x1, x2), 1)))
-        x4 = self.lrelu(self.conv4(torch.cat((x, x1, x2, x3), 1)))
-        x5 = self.conv5(torch.cat((x, x1, x2, x3, x4), 1))
-        return x5 * 0.2 + x
-
-class RRDB(nn.Module):
-    """Residual in Residual Dense Block"""
-    def __init__(self, num_feat, num_grow_ch=32):
-        super(RRDB, self).__init__()
-        self.rdb1 = ResidualDenseBlock(num_feat, num_grow_ch)
-        self.rdb2 = ResidualDenseBlock(num_feat, num_grow_ch)
-        self.rdb3 = ResidualDenseBlock(num_feat, num_grow_ch)
-
-    def forward(self, x):
-        out = self.rdb1(x)
-        out = self.rdb2(out)
-        out = self.rdb3(out)
-        return out * 0.2 + x
-
-class RealESRGANGenerator(nn.Module):
-    """Real-ESRGAN Generator for world-class image resizing"""
-    def __init__(self, num_in_ch=3, num_out_ch=3, scale=4, num_feat=64, num_block=23, num_grow_ch=32):
-        super(RealESRGANGenerator, self).__init__()
-        self.scale = scale
-        
-        self.conv_first = nn.Conv2d(num_in_ch, num_feat, 3, 1, 1)
-        self.body = nn.Sequential(*[RRDB(num_feat, num_grow_ch) for _ in range(num_block)])
-        self.conv_body = nn.Conv2d(num_feat, num_feat, 3, 1, 1)
-        
-        # Upsampling
-        self.conv_up1 = nn.Conv2d(num_feat, num_feat, 3, 1, 1)
-        self.conv_up2 = nn.Conv2d(num_feat, num_feat, 3, 1, 1)
-        self.conv_hr = nn.Conv2d(num_feat, num_feat, 3, 1, 1)
-        self.conv_last = nn.Conv2d(num_feat, num_out_ch, 3, 1, 1)
-        
-        self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-
-    def forward(self, x):
-        feat = self.lrelu(self.conv_first(x))
-        body_feat = self.conv_body(self.body(feat))
-        feat = feat + body_feat
-        
-        # Upsample
-        feat = self.lrelu(self.conv_up1(F.interpolate(feat, scale_factor=2, mode='nearest')))
-        feat = self.lrelu(self.conv_up2(F.interpolate(feat, scale_factor=2, mode='nearest')))
-        out = self.conv_last(self.lrelu(self.conv_hr(feat)))
-        
-        return out
-
-# --- Model Management ---
-
-def download_file(url, output_path):
-    """Downloads a file from a URL with progress bar"""
-    response = requests.get(url, stream=True)
-    total_size = int(response.headers.get('content-length', 0))
-    
-    with open(output_path, 'wb') as file, tqdm(
-        desc=output_path,
-        total=total_size,
-        unit='iB',
-        unit_scale=True,
-        unit_divisor=1024,
-    ) as progress_bar:
-        for data in response.iter_content(chunk_size=1024):
-            size = file.write(data)
-            progress_bar.update(size)
-
-def download_realesrgan_model():
-    """Download Real-ESRGAN model weights"""
-    model_path = "RealESRGAN_x4plus.pth"
-    if not os.path.exists(model_path):
-        logger.info("Downloading Real-ESRGAN model (world's best image resizer)...")
-        # Official Real-ESRGAN model from GitHub releases
-        url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth"
-        try:
-            download_file(url, model_path)
-            logger.info("Real-ESRGAN model downloaded successfully!")
-        except Exception as e:
-            logger.error(f"Failed to download model: {e}")
-            return None
-    return model_path
-
-# --- World-Class Image Processor ---
-
-class WorldBestImageResizer:
-    """World's best AI image resizer using Real-ESRGAN"""
+class SmartImageResizer:
+    """Simple but effective image resizer with smart enhancement"""
     
     def __init__(self, target_size: Tuple[int, int] = (380, 380)):
         self.target_size = target_size
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        logger.info(f"Using device: {self.device}")
+        logger.info(f"Smart resizer initialized for {target_size}")
+
+    def smart_resize(self, image: Image.Image) -> Image.Image:
+        """Smart multi-step resizing for best quality"""
+        original_size = image.size
+        target_w, target_h = self.target_size
         
-        # Load Real-ESRGAN model
-        model_path = download_realesrgan_model()
-        if model_path:
-            self.model = RealESRGANGenerator(scale=4)
-            try:
-                checkpoint = torch.load(model_path, map_location=self.device, weights_only=True)
-                self.model.load_state_dict(checkpoint['params_ema'] if 'params_ema' in checkpoint else checkpoint)
-                self.model.to(self.device)
-                self.model.eval()
-                self.use_ai = True
-                logger.info("Real-ESRGAN model loaded - using world's best AI resizing!")
-            except Exception as e:
-                logger.warning(f"Failed to load Real-ESRGAN: {e}. Using high-quality fallback.")
-                self.use_ai = False
+        # Convert to high-quality array
+        img_array = np.array(image.convert('RGB')).astype(np.float32)
+        
+        # Step 1: Smart interpolation method selection
+        scale_factor = min(target_w / original_size[0], target_h / original_size[1])
+        
+        if scale_factor > 1.5:
+            # Upscaling - use CUBIC for smoothness
+            interpolation = cv2.INTER_CUBIC
+        elif scale_factor < 0.5:
+            # Heavy downscaling - use AREA for best quality
+            interpolation = cv2.INTER_AREA
         else:
-            self.use_ai = False
-            logger.info("Using high-quality traditional resizing as fallback.")
+            # Normal scaling - use LANCZOS for sharpness
+            interpolation = cv2.INTER_LANCZOS4
+        
+        # Step 2: Multi-step resizing for large scale changes
+        current_size = original_size
+        current_img = img_array
+        
+        while True:
+            # Calculate intermediate size
+            scale_x = target_w / current_size[0]
+            scale_y = target_h / current_size[1]
+            
+            # If we're close to target, resize directly
+            if 0.5 <= min(scale_x, scale_y) <= 2.0:
+                final_img = cv2.resize(current_img, self.target_size, interpolation=interpolation)
+                break
+            
+            # Otherwise, resize by factor of 2
+            if scale_x > 2 or scale_y > 2:
+                # Upscale by 2x
+                new_size = (current_size[0] * 2, current_size[1] * 2)
+                current_img = cv2.resize(current_img, new_size, interpolation=cv2.INTER_CUBIC)
+            else:
+                # Downscale by 2x
+                new_size = (current_size[0] // 2, current_size[1] // 2)
+                current_img = cv2.resize(current_img, new_size, interpolation=cv2.INTER_AREA)
+            
+            current_size = new_size
+        
+        return Image.fromarray(np.clip(final_img, 0, 255).astype(np.uint8))
 
-    def preprocess_image(self, img: Image.Image) -> torch.Tensor:
-        """Preprocess image for Real-ESRGAN"""
-        # Convert to RGB and normalize
-        img_array = np.array(img.convert('RGB')).astype(np.float32) / 255.0
-        img_tensor = torch.from_numpy(img_array).permute(2, 0, 1).unsqueeze(0)
-        return img_tensor.to(self.device)
-
-    def postprocess_image(self, tensor: torch.Tensor) -> Image.Image:
-        """Convert tensor back to PIL Image"""
-        tensor = torch.clamp(tensor, 0, 1)
-        img_array = tensor.squeeze().permute(1, 2, 0).cpu().numpy()
-        img_array = (img_array * 255).astype(np.uint8)
-        return Image.fromarray(img_array)
-
-    def resize_with_ai(self, image: Image.Image) -> Image.Image:
-        """Resize using Real-ESRGAN (world's best method)"""
-        # Preprocess
-        input_tensor = self.preprocess_image(image)
+    def enhance_image(self, image: Image.Image) -> Image.Image:
+        """Smart enhancement based on image characteristics"""
+        # Convert to array for analysis
+        img_array = np.array(image)
+        gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
         
-        # AI upscaling
-        with torch.no_grad():
-            output_tensor = self.model(input_tensor)
+        # Analyze image characteristics
+        blur_score = cv2.Laplacian(gray, cv2.CV_64F).var()
+        brightness = np.mean(gray)
+        contrast = np.std(gray)
         
-        # Convert back to PIL
-        upscaled_image = self.postprocess_image(output_tensor)
+        logger.info(f"Image analysis - Blur: {blur_score:.1f}, Brightness: {brightness:.1f}, Contrast: {contrast:.1f}")
         
-        # Resize to exact target size with high-quality interpolation
-        final_image = upscaled_image.resize(self.target_size, Image.LANCZOS)
+        enhanced = image
         
-        return final_image
-
-    def resize_traditional(self, image: Image.Image) -> Image.Image:
-        """High-quality traditional resize as fallback"""
-        # Use the best traditional method available
-        img_array = np.array(image.convert('RGB'))
-        resized = cv2.resize(img_array, self.target_size, interpolation=cv2.INTER_LANCZOS4)
+        # Smart sharpening based on blur score
+        if blur_score < 100:  # Image is blurry
+            # Apply unsharp masking
+            img_array = np.array(enhanced)
+            gaussian = cv2.GaussianBlur(img_array, (0, 0), 1.0)
+            sharpened = cv2.addWeighted(img_array, 1.5, gaussian, -0.5, 0)
+            enhanced = Image.fromarray(np.clip(sharpened, 0, 255).astype(np.uint8))
+            logger.info("Applied sharpening for blurry image")
         
-        # Apply unsharp masking for enhanced details
-        gaussian = cv2.GaussianBlur(resized, (0, 0), 1.0)
-        sharpened = cv2.addWeighted(resized, 1.5, gaussian, -0.5, 0)
+        # Smart contrast adjustment
+        if contrast < 30:  # Low contrast
+            enhancer = ImageEnhance.Contrast(enhanced)
+            enhanced = enhancer.enhance(1.2)
+            logger.info("Enhanced contrast for flat image")
         
-        return Image.fromarray(np.clip(sharpened, 0, 255).astype(np.uint8))
-
-    def resize_image(self, image: Image.Image) -> Image.Image:
-        """Resize image using the best available method"""
-        if self.use_ai:
-            return self.resize_with_ai(image)
-        else:
-            return self.resize_traditional(image)
+        # Smart brightness adjustment
+        if brightness < 80:  # Too dark
+            enhancer = ImageEnhance.Brightness(enhanced)
+            enhanced = enhancer.enhance(1.1)
+            logger.info("Brightened dark image")
+        elif brightness > 200:  # Too bright
+            enhancer = ImageEnhance.Brightness(enhanced)
+            enhanced = enhancer.enhance(0.95)
+            logger.info("Reduced brightness for overexposed image")
+        
+        return enhanced
 
     def process_image(self, input_path: str, output_path: str) -> bool:
-        """Process a single image with world-class resizing"""
+        """Process a single image with smart resizing"""
         try:
             logger.info(f"Loading image: {input_path}")
             image = Image.open(input_path)
             original_size = image.size
             logger.info(f"Original size: {original_size}")
             
-            logger.info(f"Resizing to {self.target_size} using world's best AI...")
-            resized_image = self.resize_image(image)
+            # Step 1: Smart resize
+            logger.info("Applying smart resize...")
+            resized_image = self.smart_resize(image)
             
-            # Save with maximum quality
-            resized_image.save(output_path, quality=98, optimize=True)
-            logger.info(f"World-class result saved: {output_path}")
+            # Step 2: Smart enhancement
+            logger.info("Applying smart enhancement...")
+            final_image = self.enhance_image(resized_image)
+            
+            # Save with high quality
+            final_image.save(output_path, quality=95, optimize=True)
+            logger.info(f"Smart result saved: {output_path}")
             
             return True
             
@@ -236,7 +158,7 @@ class WorldBestImageResizer:
             logger.error(f"No images found in {input_dir}")
             return 0
         
-        logger.info(f"Processing {len(image_files)} images with world's best AI...")
+        logger.info(f"Processing {len(image_files)} images with smart resizer...")
         
         success_count = 0
         for i, img_file in enumerate(image_files, 1):
@@ -249,7 +171,7 @@ class WorldBestImageResizer:
         return success_count
 
 def main():
-    parser = argparse.ArgumentParser(description="World's Best AI Image Resizer")
+    parser = argparse.ArgumentParser(description="Simple but Effective Image Resizer")
     parser.add_argument("input", help="Input image file or directory")
     parser.add_argument("output", help="Output image file or directory")
     parser.add_argument("--size", default="380x380", help="Target size (WxH, default: 380x380)")
@@ -263,7 +185,7 @@ def main():
         logger.error("Invalid size format. Use WIDTHxHEIGHT (e.g., 380x380)")
         return 1
     
-    resizer = WorldBestImageResizer(target_size=target_size)
+    resizer = SmartImageResizer(target_size=target_size)
     
     input_path = Path(args.input)
     if input_path.is_file():

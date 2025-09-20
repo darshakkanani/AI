@@ -10,17 +10,12 @@ import argparse
 import os
 import logging
 import time
-import math
 from typing import Tuple, List, Optional, Union
 import numpy as np
-import cv2
-
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
+
+import torch.utils.data
 from PIL import Image
-import torchvision.transforms as T
 
 # Import components from existing modules
 from image_resizing import AdvancedImageResizer, load_image, pil_to_tensor, tensor_to_pil
@@ -282,12 +277,14 @@ def main():
         logging.info(f"Final result saved: {args.output}")
         
         if args.save_intermediate:
-            intermediate_path = args.output.replace('.', '_resized.')
+            base, ext = os.path.splitext(args.output)
+            intermediate_path = f"{base}_resized{ext or '.png'}"
             intermediate.save(intermediate_path, quality=95, optimize=True)
             logging.info(f"Intermediate result saved: {intermediate_path}")
         
         if args.save_mask:
-            mask_path = args.output.replace('.', '_mask.')
+            base, ext = os.path.splitext(args.output)
+            mask_path = f"{base}_mask{ext or '.png'}"
             mask.save(mask_path, quality=95, optimize=True)
             logging.info(f"Hair mask saved: {mask_path}")
         
@@ -349,12 +346,14 @@ def main():
             
             # Save intermediate if requested
             if args.save_intermediate:
-                intermediate_path = os.path.join(args.output, f"resized_{filename}")
+                base, ext = os.path.splitext(output_path)
+                intermediate_path = f"{base}_resized{ext or '.png'}"
                 intermediate.save(intermediate_path, quality=95, optimize=True)
             
             # Save mask if requested
             if args.save_mask:
-                mask_path = os.path.join(args.output, f"mask_{filename}")
+                base, ext = os.path.splitext(output_path)
+                mask_path = f"{base}_mask{ext or '.png'}"
                 mask.save(mask_path, quality=95, optimize=True)
         
         logging.info(f"Batch processing completed: {len(image_files)} images in {total_time:.2f}s")

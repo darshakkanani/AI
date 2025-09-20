@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 Enterprise Hair Removal AI - State-of-the-Art Model
@@ -16,12 +15,10 @@ import time
 import math
 from typing import Tuple, List, Optional, Union
 import numpy as np
-import cv2
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
 from PIL import Image
 import torchvision.transforms as T
 
@@ -509,7 +506,9 @@ def main():
         start_time = time.time()
         if args.save_mask:
             result, mask = processor.process_single_image(img, return_mask=True)
-            mask.save(args.output.replace('.', '_mask.'))
+            base, ext = os.path.splitext(args.output)
+            mask_path = f"{base}_mask{ext or '.png'}"
+            mask.save(mask_path, quality=95, optimize=True)
         else:
             result = processor.process_single_image(img)
         

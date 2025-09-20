@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """
-Advanced Hair Removal Model
-- Multi-scale hair detection using morphological operations
-- Advanced inpainting for natural skin restoration
-- Edge-preserving smoothing
-- Skin tone analysis and enhancement
-- Memory-efficient processing
+Most Accurate Hair Removal Model
+- Optimized Black-Hat morphological operations for precise hair detection
+- Advanced multi-method inpainting for natural hair removal
+- Maximum accuracy output with professional quality
 """
 
 import argparse
@@ -13,226 +11,232 @@ import os
 import sys
 import logging
 from pathlib import Path
-from typing import Tuple, List
+from typing import Tuple
 import numpy as np
 import cv2
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image
 import gc
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class AdvancedHairRemover:
-    """Advanced hair removal model for clear skin visibility"""
+class AccurateHairRemover:
+    """Most accurate hair removal using optimized black-hat and inpainting"""
     
     def __init__(self):
-        logger.info("Advanced Hair Removal Model initialized")
+        logger.info("Most Accurate Hair Removal Model initialized")
         
-    def detect_hair_multiscale(self, image: np.ndarray) -> np.ndarray:
-        """Multi-scale hair detection using advanced morphological operations"""
+    def detect_hair_blackhat(self, image: np.ndarray) -> np.ndarray:
+        """Optimized black-hat morphological operations for maximum hair detection accuracy"""
+        logger.info("Applying optimized black-hat hair detection...")
+        
+        # Convert to optimal color spaces for hair detection
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
-        hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
         
-        # Initialize mask collection
+        # Collection of hair masks from different methods
         hair_masks = []
         
-        # Method 1: Multi-scale black-hat operations on grayscale
-        logger.info("Applying multi-scale morphological detection...")
-        for kernel_size in [7, 11, 15, 19]:
-            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
+        # Method 1: Multi-scale rectangular kernels (best for straight hairs)
+        logger.info("Detecting straight hair patterns...")
+        for size in [7, 11, 15, 19, 23]:
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (size, size))
             blackhat = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel)
             hair_masks.append(blackhat)
         
-        # Method 2: L-channel analysis (best for hair detection)
+        # Method 2: Multi-scale elliptical kernels (best for curved hairs)
+        logger.info("Detecting curved hair patterns...")
+        for size in [5, 9, 13, 17]:
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size))
+            blackhat = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel)
+            hair_masks.append(blackhat)
+        
+        # Method 3: LAB L-channel black-hat (most sensitive to hair)
+        logger.info("Analyzing L-channel for fine hair detection...")
         l_channel = lab[:,:,0]
-        for kernel_size in [5, 9, 13]:
-            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
+        for size in [5, 9, 13, 17, 21]:
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (size, size))
             l_blackhat = cv2.morphologyEx(l_channel, cv2.MORPH_BLACKHAT, kernel)
             hair_masks.append(l_blackhat)
         
-        # Method 3: V-channel analysis (value channel in HSV)
-        v_channel = hsv[:,:,2]
-        inverted_v = 255 - v_channel
-        for kernel_size in [3, 7, 11]:
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
-            v_blackhat = cv2.morphologyEx(inverted_v, cv2.MORPH_BLACKHAT, kernel)
-            hair_masks.append(v_blackhat)
+        # Method 4: Directional kernels for hair strand orientation
+        logger.info("Detecting directional hair strands...")
         
-        # Method 4: Directional filters for hair strands
-        logger.info("Applying directional hair detection...")
-        # Horizontal hair detection
-        kernel_h = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 1))
-        hair_h = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel_h)
-        hair_masks.append(hair_h)
+        # Horizontal hair strands
+        for width in [11, 15, 19]:
+            kernel_h = cv2.getStructuringElement(cv2.MORPH_RECT, (width, 1))
+            hair_h = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel_h)
+            hair_masks.append(hair_h)
         
-        # Vertical hair detection
-        kernel_v = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 15))
-        hair_v = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel_v)
-        hair_masks.append(hair_v)
+        # Vertical hair strands  
+        for height in [11, 15, 19]:
+            kernel_v = cv2.getStructuringElement(cv2.MORPH_RECT, (1, height))
+            hair_v = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel_v)
+            hair_masks.append(hair_v)
         
-        # Diagonal hair detection
-        kernel_d1 = np.array([[1,0,0,0,0],[0,1,0,0,0],[0,0,1,0,0],[0,0,0,1,0],[0,0,0,0,1]], dtype=np.uint8)
-        kernel_d2 = np.array([[0,0,0,0,1],[0,0,0,1,0],[0,0,1,0,0],[0,1,0,0,0],[1,0,0,0,0]], dtype=np.uint8)
-        hair_d1 = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel_d1)
-        hair_d2 = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel_d2)
-        hair_masks.extend([hair_d1, hair_d2])
+        # Diagonal hair strands (45-degree angles)
+        for size in [7, 11, 15]:
+            # Create diagonal kernels
+            kernel_d1 = np.eye(size, dtype=np.uint8)
+            kernel_d2 = np.fliplr(np.eye(size, dtype=np.uint8))
+            
+            hair_d1 = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel_d1)
+            hair_d2 = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel_d2)
+            hair_masks.extend([hair_d1, hair_d2])
         
-        # Combine all masks using maximum operation
-        logger.info("Combining detection results...")
+        # Method 5: Cross-shaped kernels for intersection detection
+        logger.info("Detecting hair intersections...")
+        for size in [7, 11]:
+            kernel_cross = cv2.getStructuringElement(cv2.MORPH_CROSS, (size, size))
+            hair_cross = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel_cross)
+            hair_masks.append(hair_cross)
+        
+        # Combine all masks using maximum operation for best coverage
+        logger.info("Combining all detection results...")
         combined_mask = np.maximum.reduce(hair_masks).astype(np.float32)
+        
+        # Apply Gaussian blur to smooth the combined mask
+        combined_mask = cv2.GaussianBlur(combined_mask, (3, 3), 0)
         
         return combined_mask
     
-    def refine_hair_mask(self, mask: np.ndarray, image: np.ndarray) -> np.ndarray:
-        """Advanced mask refinement using adaptive thresholding and morphology"""
-        logger.info("Refining hair mask...")
+    def refine_hair_mask(self, mask: np.ndarray) -> np.ndarray:
+        """Precise mask refinement for maximum accuracy"""
+        logger.info("Refining hair mask for maximum accuracy...")
         
-        # Adaptive thresholding based on mask statistics
-        non_zero_mask = mask[mask > 0]
-        if len(non_zero_mask) > 0:
-            # Use 85th percentile for aggressive hair detection
-            threshold_val = np.percentile(non_zero_mask, 85)
+        # Adaptive thresholding for optimal hair selection
+        non_zero_pixels = mask[mask > 0]
+        if len(non_zero_pixels) > 0:
+            # Use 80th percentile for aggressive but accurate detection
+            threshold = np.percentile(non_zero_pixels, 80)
         else:
-            threshold_val = np.mean(mask) + 2 * np.std(mask)
+            threshold = np.mean(mask) + 1.5 * np.std(mask)
         
         # Apply threshold
-        _, binary_mask = cv2.threshold(mask, threshold_val, 255, cv2.THRESH_BINARY)
+        _, binary_mask = cv2.threshold(mask, threshold, 255, cv2.THRESH_BINARY)
         binary_mask = binary_mask.astype(np.uint8)
         
-        # Morphological refinement
+        # Morphological operations for clean mask
         # Close small gaps in hair strands
         kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         refined_mask = cv2.morphologyEx(binary_mask, cv2.MORPH_CLOSE, kernel_close, iterations=2)
         
-        # Remove noise (small isolated pixels)
+        # Remove small noise
         kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
         refined_mask = cv2.morphologyEx(refined_mask, cv2.MORPH_OPEN, kernel_open, iterations=1)
         
-        # Remove very small components
+        # Remove tiny components (noise)
         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(refined_mask)
-        min_area = 15  # Minimum hair strand area
+        min_area = 12  # Minimum area for a hair strand
         for i in range(1, num_labels):
             if stats[i, cv2.CC_STAT_AREA] < min_area:
                 refined_mask[labels == i] = 0
         
-        # Dilate slightly to ensure complete hair coverage
+        # Slight dilation to ensure complete hair coverage
         kernel_dilate = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
-        refined_mask = cv2.dilate(refined_mask, kernel_dilate, iterations=1)
+        final_mask = cv2.dilate(refined_mask, kernel_dilate, iterations=1)
         
-        return refined_mask
+        return final_mask
     
     def advanced_inpainting(self, image: np.ndarray, mask: np.ndarray) -> np.ndarray:
-        """Advanced inpainting with skin-aware restoration"""
-        logger.info("Applying advanced skin-aware inpainting...")
+        """Most accurate inpainting using multiple methods for natural results"""
+        logger.info("Applying advanced multi-method inpainting...")
         
-        # Method 1: Fast Marching Method (good for texture)
-        inpainted_fm = cv2.inpaint(image, mask, 3, cv2.INPAINT_TELEA)
+        # Method 1: Fast Marching Method (TELEA) - excellent for textures
+        inpainted_telea = cv2.inpaint(image, mask, inpaintRadius=3, flags=cv2.INPAINT_TELEA)
         
-        # Method 2: Navier-Stokes based (good for smooth areas)
-        inpainted_ns = cv2.inpaint(image, mask, 5, cv2.INPAINT_NS)
+        # Method 2: Navier-Stokes (NS) - excellent for smooth regions
+        inpainted_ns = cv2.inpaint(image, mask, inpaintRadius=5, flags=cv2.INPAINT_NS)
         
-        # Combine both methods for best results
-        # Use NS for smooth skin areas, FM for textured areas
+        # Method 3: Enhanced TELEA with larger radius for complex areas
+        inpainted_telea_large = cv2.inpaint(image, mask, inpaintRadius=7, flags=cv2.INPAINT_TELEA)
+        
+        # Analyze image texture to blend methods optimally
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         
-        # Detect smooth vs textured regions
+        # Calculate local texture using Laplacian
         laplacian = cv2.Laplacian(gray, cv2.CV_64F)
-        texture_score = np.abs(laplacian)
-        texture_threshold = np.percentile(texture_score, 70)
+        texture_map = np.abs(laplacian)
         
-        # Create blending mask
-        smooth_regions = (texture_score < texture_threshold).astype(np.float32)
-        smooth_regions = cv2.GaussianBlur(smooth_regions, (5, 5), 0)
+        # Smooth the texture map
+        texture_map = cv2.GaussianBlur(texture_map, (5, 5), 0)
         
-        # Blend the two inpainting results
+        # Create blending weights based on texture
+        texture_threshold_low = np.percentile(texture_map, 30)
+        texture_threshold_high = np.percentile(texture_map, 70)
+        
+        # Normalize texture map to [0, 1]
+        texture_norm = np.clip((texture_map - texture_threshold_low) / 
+                              (texture_threshold_high - texture_threshold_low), 0, 1)
+        
+        # Blend the three inpainting results
         result = np.zeros_like(image, dtype=np.float32)
+        
         for c in range(3):
-            result[:,:,c] = (smooth_regions * inpainted_ns[:,:,c] + 
-                           (1 - smooth_regions) * inpainted_fm[:,:,c])
+            # Smooth areas: more NS
+            # Medium texture: blend of NS and TELEA
+            # High texture: more TELEA with large radius
+            result[:,:,c] = (
+                (1 - texture_norm) * (0.7 * inpainted_ns[:,:,c] + 0.3 * inpainted_telea[:,:,c]) +
+                texture_norm * (0.6 * inpainted_telea_large[:,:,c] + 0.4 * inpainted_telea[:,:,c])
+            )
         
-        return result.astype(np.uint8)
-    
-    def enhance_skin_clarity(self, image: np.ndarray) -> np.ndarray:
-        """Enhance skin clarity and smoothness"""
-        logger.info("Enhancing skin clarity...")
+        # Final smoothing only in inpainted regions
+        final_result = result.astype(np.uint8)
         
-        # Convert to different color spaces for analysis
-        lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
-        hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+        # Apply bilateral filter only to inpainted areas for natural blending
+        mask_3channel = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB) / 255.0
+        smoothed = cv2.bilateralFilter(final_result, 9, 75, 75)
         
-        # Skin tone enhancement in LAB space
-        l, a, b = cv2.split(lab)
-        
-        # Enhance L channel (lightness) for better skin appearance
-        clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8,8))
-        l_enhanced = clahe.apply(l)
-        
-        # Slight smoothing of A and B channels for more natural skin tones
-        a_smooth = cv2.bilateralFilter(a, 9, 75, 75)
-        b_smooth = cv2.bilateralFilter(b, 9, 75, 75)
-        
-        # Reconstruct LAB image
-        enhanced_lab = cv2.merge([l_enhanced, a_smooth, b_smooth])
-        enhanced_rgb = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
-        
-        # Apply subtle skin smoothing
-        # Use bilateral filter to smooth while preserving edges
-        smooth_skin = cv2.bilateralFilter(enhanced_rgb, 15, 80, 80)
-        
-        # Blend original and smoothed for natural look
-        alpha = 0.3  # 30% smoothing
-        final_result = cv2.addWeighted(enhanced_rgb, 1-alpha, smooth_skin, alpha, 0)
+        # Blend smoothed result only in hair regions
+        final_result = (mask_3channel * smoothed + (1 - mask_3channel) * image).astype(np.uint8)
         
         return final_result
     
     def remove_hair(self, image: Image.Image) -> Tuple[Image.Image, Image.Image]:
-        """Complete hair removal pipeline"""
-        logger.info("Starting advanced hair removal process...")
+        """Complete accurate hair removal pipeline"""
+        logger.info("Starting most accurate hair removal process...")
         
         # Convert to numpy array
         img_array = np.array(image.convert('RGB'))
         
-        # Step 1: Multi-scale hair detection
-        hair_mask_raw = self.detect_hair_multiscale(img_array)
+        # Step 1: Optimized black-hat hair detection
+        hair_mask_raw = self.detect_hair_blackhat(img_array)
         
-        # Step 2: Refine hair mask
-        hair_mask = self.refine_hair_mask(hair_mask_raw, img_array)
+        # Step 2: Precise mask refinement
+        hair_mask = self.refine_hair_mask(hair_mask_raw)
         
-        # Step 3: Advanced inpainting
-        inpainted = self.advanced_inpainting(img_array, hair_mask)
-        
-        # Step 4: Enhance skin clarity
-        final_result = self.enhance_skin_clarity(inpainted)
+        # Step 3: Advanced multi-method inpainting
+        inpainted_result = self.advanced_inpainting(img_array, hair_mask)
         
         # Convert back to PIL Images
-        result_image = Image.fromarray(final_result)
+        result_image = Image.fromarray(inpainted_result)
         mask_image = Image.fromarray(hair_mask)
         
-        logger.info("Hair removal completed successfully")
+        logger.info("Most accurate hair removal completed successfully")
         return result_image, mask_image
     
     def process_image(self, input_path: str, output_path: str, save_mask: bool = True) -> bool:
-        """Process a single image for hair removal"""
+        """Process a single image with maximum accuracy"""
         try:
             logger.info(f"Loading image: {input_path}")
             image = Image.open(input_path)
             original_size = image.size
             logger.info(f"Processing image size: {original_size}")
             
-            # Apply hair removal
+            # Apply most accurate hair removal
             clean_image, hair_mask = self.remove_hair(image)
             
-            # Save results
-            clean_image.save(output_path, quality=95, optimize=True)
-            logger.info(f"Clean skin image saved: {output_path}")
+            # Save results with maximum quality
+            clean_image.save(output_path, quality=98, optimize=True)
+            logger.info(f"Most accurate clean skin image saved: {output_path}")
             
             if save_mask:
                 base, ext = os.path.splitext(output_path)
                 mask_path = f"{base}_hair_mask{ext}"
-                hair_mask.save(mask_path)
-                logger.info(f"Hair mask saved: {mask_path}")
+                hair_mask.save(mask_path, quality=98)
+                logger.info(f"Hair detection mask saved: {mask_path}")
             
             # Memory cleanup
             del image, clean_image, hair_mask
@@ -245,7 +249,7 @@ class AdvancedHairRemover:
             return False
     
     def process_batch(self, input_dir: str, output_dir: str, save_masks: bool = True) -> int:
-        """Process multiple images"""
+        """Process multiple images with maximum accuracy"""
         input_path = Path(input_dir)
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
@@ -257,7 +261,7 @@ class AdvancedHairRemover:
             logger.error(f"No images found in {input_dir}")
             return 0
         
-        logger.info(f"Processing {len(image_files)} images for hair removal...")
+        logger.info(f"Processing {len(image_files)} images with maximum accuracy...")
         
         success_count = 0
         for i, img_file in enumerate(image_files, 1):
@@ -266,18 +270,18 @@ class AdvancedHairRemover:
             if self.process_image(str(img_file), str(output_file), save_masks):
                 success_count += 1
         
-        logger.info(f"Successfully processed {success_count}/{len(image_files)} images")
+        logger.info(f"Successfully processed {success_count}/{len(image_files)} images with maximum accuracy")
         return success_count
 
 def main():
-    parser = argparse.ArgumentParser(description="Advanced Hair Removal for Clear Skin")
+    parser = argparse.ArgumentParser(description="Most Accurate Hair Removal Model")
     parser.add_argument("input", help="Input image file or directory")
     parser.add_argument("output", help="Output image file or directory")
-    parser.add_argument("--no-mask", action="store_true", help="Don't save hair mask")
+    parser.add_argument("--no-mask", action="store_true", help="Don't save hair detection mask")
     
     args = parser.parse_args()
     
-    hair_remover = AdvancedHairRemover()
+    hair_remover = AccurateHairRemover()
     
     input_path = Path(args.input)
     save_masks = not args.no_mask

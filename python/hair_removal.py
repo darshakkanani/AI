@@ -249,10 +249,10 @@ def main():
 
 if __name__ == "__main__":
     # If run directly, process the default image
-    default_path = '/Users/hunter/Desktop/Project/AI/image/IMG_0341.jpg'
+    default_path = '/Users/hunter/Desktop/Project/AI/image/resized_image/IMG_0342.jpg'
     if os.path.exists(default_path):
         print("Processing default image...")
         process_hair_removal(default_path, 
-                           output_path='/Users/hunter/Desktop/Project/AI/image/IMG_0341_hair_removed.jpg')
+                           output_path='/Users/hunter/Desktop/Project/AI/image/hair_removed_image/IMG_0342.jpg')
     else:
         main()

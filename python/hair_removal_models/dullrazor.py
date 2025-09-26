@@ -9,7 +9,7 @@ import cv2
 #IMAGE ACQUISITION
 
 #Input image
-path='/Users/hunter/Desktop/Project/AI/Dataset/Dataset_hair_training_testing/A skin lesion hair mask dataset with fine-grained annotations/dermoscopic_image/ISIC_0000032.png'
+path='/Users/hunter/Desktop/Project/AI/Dataset/Dataset_hair_training_testing/A skin lesion hair mask dataset with fine-grained annotations/dermoscopic_image/ISIC_0000069.png'
 #Read image
 image=cv2.imread(path,cv2.IMREAD_COLOR)
 #Image cropping

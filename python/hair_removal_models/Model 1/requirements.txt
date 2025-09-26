@@ -1,0 +1,24 @@
+# Core dependencies
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+requests>=2.31.0
+
+# SAM dependencies
+torch>=2.0.0
+torchvision>=0.15.0
+segment-anything>=1.0
+
+# LaMa dependencies
+lama-cleaner>=1.2.0
+
+# Optional GPU support
+# torch>=2.0.0+cu118  # Uncomment for CUDA 11.8
+# torchvision>=0.15.0+cu118  # Uncomment for CUDA 11.8
+
+# Alternative LaMa implementation (if lama-cleaner doesn't work)
+# git+https://github.com/advimman/lama.git
+
+# Development dependencies (optional)
+# matplotlib>=3.7.0
+# jupyter>=1.0.0

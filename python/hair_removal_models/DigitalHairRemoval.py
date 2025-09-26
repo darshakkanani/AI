@@ -9,7 +9,7 @@ Following are the DHR tasks followed in this example code:
 """
 
 import cv2
-src = cv2.imread("/Users/hunter/Desktop/Project/AI/Dataset/Dataset_hair_training_testing/A skin lesion hair mask dataset with fine-grained annotations/dermoscopic_image/ISIC_0000032.png")
+src = cv2.imread("/Users/hunter/Desktop/Project/AI/Dataset/Dataset_hair_training_testing/A skin lesion hair mask dataset with fine-grained annotations/dermoscopic_image/ISIC_0000069.png")
 
 print( src.shape )
 cv2.imshow("original Image" , src )
@@ -39,4 +39,4 @@ cv2.imwrite('thresholded_sample1.jpg', thresh2, [int(cv2.IMWRITE_JPEG_QUALITY), 
 # inpaint the original image depending on the mask
 dst = cv2.inpaint(src,thresh2,1,cv2.INPAINT_TELEA)
 cv2.imshow("InPaint",dst)
-cv2.imwrite('/Users/hunter/Desktop/Project/AI/image/hair_removed_image/IMG_0341.jpg', dst, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+cv2.imwrite('/Users/hunter/Desktop/Project/AI/image/hair_removed_image/IMG_0069.jpg', dst, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
